@@ -243,11 +243,44 @@ func (e *Entry) setSize(str string) (err error) {
 }
 
 func (e *Entry) setTime(fields []string, now time.Time, loc *time.Location) (err error) {
+
+	monthStr := strconv.QuoteToASCII(fields[0])
+	// 判断是否包含"月"
+	if strings.Contains(monthStr, "\\xd4\\xc2") {
+		monthStr = strings.Replace(monthStr, "\\xd4\\xc2", "", -1)
+		monthStr = monthStr[1 : len(monthStr)-1]
+		fields[0] = monthStr
+	} else {
+		// 年份有的服务器会在月之前，有的在日之后
+		if len(fields[0]) == 4 {
+			fields[0], fields[1], fields[2] = fields[1], fields[2], fields[0]
+		}
+	}
+
+	// 再次判断是否包含"月"
+	monthStr = strconv.QuoteToASCII(fields[0])
+	if strings.Contains(monthStr, "\\xd4\\xc2") {
+		monthStr = strings.Replace(monthStr, "\\xd4\\xc2", "", -1)
+		monthStr = monthStr[1 : len(monthStr)-1]
+		fields[0] = monthStr
+	}
+
+	dayStr := strconv.QuoteToASCII(fields[1])
+	// 判断是否包含"日"
+	if strings.Contains(dayStr, "\\xc8\\xd5") {
+		dayStr = strings.Replace(dayStr, "\\xc8\\xd5", "", -1)
+		dayStr = dayStr[1 : len(dayStr)-1]
+		fields[1] = dayStr
+	}
+
 	if strings.Contains(fields[2], ":") { // contains time
 		thisYear, _, _ := now.Date()
 		timeStr := fmt.Sprintf("%s %s %d %s", fields[1], fields[0], thisYear, fields[2])
 		e.Time, err = time.ParseInLocation("_2 Jan 2006 15:04", timeStr, loc)
 
+		if err != nil {
+			e.Time, err = time.ParseInLocation("2 1 2006 15:04", timeStr, loc)
+		}
 		/*
 			On unix, `info ls` shows:
 
@@ -265,11 +298,16 @@ func (e *Entry) setTime(fields []string, now time.Time, loc *time.Location) (err
 		}
 
 	} else { // only the date
+
 		if len(fields[2]) != 4 {
 			return errUnsupportedListDate
 		}
 		timeStr := fmt.Sprintf("%s %s %s 00:00", fields[1], fields[0], fields[2])
 		e.Time, err = time.ParseInLocation("_2 Jan 2006 15:04", timeStr, loc)
+		if err != nil {
+			e.Time, err = time.ParseInLocation("2 1 2006 15:04", timeStr, loc)
+		}
 	}
+
 	return
 }
